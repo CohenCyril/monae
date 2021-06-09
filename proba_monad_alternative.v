@@ -2,10 +2,11 @@
 
 Require Import Reals Lra.
 From mathcomp Require Import all_ssreflect.
+From mathcomp Require Import Rstruct.
 From mathcomp Require boolp.
 From infotheo Require Import ssrR Reals_ext proba.
-From infotheo Require Import fdist convex_choice.
-Require Import monae_lib monad fail_monad proba_monad.
+From infotheo Require Import fdist convex.
+Require Import monae_lib hierarchy fail_lib proba_lib.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -83,30 +84,9 @@ Proof.
 by move=> choiceDalt T p x y z; rewrite altC choiceDalt; congr Choice; rewrite altC.
 Qed.
 
-
-Local Notation strict p := ((p != 0%:pr) && (p != 1%:pr)).
-
-Lemma strict_square (p : prob) : strict p -> strict (p * p)%:pr.
-Proof.
-move=> sp.
-apply/andP; split; first by case/andP: sp=> *; rewrite mulR_neq0'; apply/andP; split.
-apply/eqP.
-move/(congr1 Prob.p)=> /= /(congr1 sqrt).
-rewrite sqrt_1 sqrt_square; last by apply Prob.ge0.
-by apply/eqP; case/andP: sp.
-Qed.
-
-Lemma strict_onem (p : prob) : strict p -> strict (p.~)%:pr.
-Proof.
-case/andP=> pneq0 pneq1.
-by apply/andP; split; apply/eqP=> /(congr1 Prob.p) /=;
-   [move/onem_eq0; apply/eqP | move/onem_eq1; apply/eqP].
-Qed.
-
 (* collapse of probabilistic choice *)
 Definition Ax_collapsed_choice :=
-  forall (T : Type) (p q : prob) (x y : M T),
-    strict p -> strict q -> x <|p|> y = x <|q|> y.
+  forall (T : Type) (p q : oprob) (x y : M T), x <|p|> y = x <|q|> y.
 
 Lemma Abou_Saleh_technical_equality (T : Type) (x y : M T) :
   x [~] y = arb >>= fun b => if b then x else y.
@@ -143,50 +123,49 @@ Lemma Keimel_technical'' (p : prob) (x y : M T) :
   x <|p|> y = (x <|p|> (x [~] y)) <|p|> ((x [~] y) <|p|> y).
 Proof. by rewrite -[LHS]altmm choiceDalt Keimel_technical Keimel_technical'. Qed.
 Lemma Keimel_technical''' (p : prob) (x y : M T) :
-  x <|p|> (x [~] y) = x <|(p*p)%:pr|> (x [~] y).
+  x <|p|> (x [~] y) = x <|(p * p)%:pr|> (x [~] y).
 Proof.
 case/boolP: (p != 1%:pr);
-  last by move/negbNE/eqP->; rewrite !choiceE /=; congr (@Conv probConvex); apply prob_ext; rewrite /= mul1R.
+  last by move/negbNE/eqP->; rewrite !choiceE /=; congr (@Conv probConvex); apply val_inj; rewrite /= mul1R.
 move=> pneq1.
 rewrite (Keimel_technical'' p x (x [~] y)) altA altmm.
 rewrite !choiceE -convA' ?p_of_rs1 ?negb_and ?pneq1 // !convmm.
 rewrite (_ : [p_of p, p] = (p * p)%:pr) //.
-by apply prob_ext; rewrite p_of_rsE.
+by apply val_inj; rewrite /= p_of_rsE.
 Qed.
 
-Lemma Keimel_A_2 (x y : M T) (p q : prob) :
-  strict p -> strict q -> p != q -> x <|p|> y = x <|q|> y ->
-  forall p q, strict p -> strict q -> x <|p|> y = x <|q|> y.
-
+Lemma Keimel_A_2 (x y : M T) (p0 q0 : oprob) :
+  p0 != q0 -> x <|p0|> y = x <|q0|> y ->
+  forall (p q : oprob), x <|p|> y = x <|q|> y.
 Admitted.
 
-Lemma Keimel_technical'''' (p q : prob) (x y : M T) :
-  strict p -> strict q ->
+Lemma Keimel_technical'''' (p q : oprob) (x y : M T) :
   x <|p|> (x [~] y) = x <|q|> (x [~] y).
 Proof.
-move=> sp sq.
-move/Keimel_A_2: (Keimel_technical''' p x y); apply=> //; first by apply strict_square.
-apply/eqP=> /(congr1 Prob.p) /=.
-have pneq0: p != 0%:pr by case/andP: sp.
+move/Keimel_A_2: (Keimel_technical''' p x y); apply=> //.
+apply/eqP=> /(congr1 (Prob.p \o OProb.p)) /=.
+(*
+have pneq0: p != 0%:opr by case/andP: sp.
 have ipneq0: / p <> 0 by apply invR_neq0;apply/eqP; case/andP: sp.
-rewrite -(eqR_mul2l ipneq0) mulRA mulVR // mul1R=> /esym.
-by apply/eqP; case/andP: sp.
+*)
+rewrite -[in X in X = _](mulR1 p) eqR_mul2l;
+by apply/eqP; rewrite ?oprob_neq0 // eq_sym oprob_neq1.
 Qed.
 End Keimel_A_3_lemmas.
 
 Theorem Keimel_A_3 : Ax_choiceDalt -> Ax_collapsed_choice.
 Proof.
-move=> choiceDalt T p q x y sp sq.
+move=> choiceDalt T p q x y.
 set Y := RHS.
 rewrite Keimel_technical'' //.
-rewrite (Keimel_technical'''' choiceDalt x y sp sq).
+rewrite (Keimel_technical'''' choiceDalt p q x y).
 rewrite [X in _ <|p|> X = Y]choiceC {2}altC.
-rewrite (Keimel_technical'''' choiceDalt y x (strict_onem sp) (strict_onem sq)).
+rewrite (Keimel_technical'''' choiceDalt (p.~)%:opr (q.~)%:opr y x).
 rewrite -[X in _ <|p|> X = Y]choiceC.
 rewrite !choiceE convACA -!choiceE altC.
-rewrite (Keimel_technical'''' choiceDalt x y sp sq).
+rewrite (Keimel_technical'''' choiceDalt p q x y).
 rewrite [X in _ <|q|> X = Y]choiceC {2}altC.
-rewrite (Keimel_technical'''' choiceDalt y x (strict_onem sp) (strict_onem sq)).
+rewrite (Keimel_technical'''' choiceDalt (p.~)%:opr (q.~)%:opr y x).
 rewrite -[X in _ <|q|> X = Y]choiceC.
 rewrite -[in X in _ <|q|> X = Y]altC.
 by rewrite -Keimel_technical'' //.
