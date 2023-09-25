@@ -88,7 +88,11 @@ Let choiceA : forall (T : Type) (p q r s : prob) (a b c : acto T),
     let bc := (choice q _ b c) in
     let ab := (choice r _ a b) in
     choice p _ a bc = choice s _ ab c.
-Proof. by move=> ? ? ? ? ? ? ? ? ? /=; exact: fsdist_convA. Qed.
+Proof.
+move=> ? p q r s a b c [] ? ? /=.
+rewrite /choice -/(conv p a (conv q b c)) -/(conv s (conv r a b) c).
+exact: convA0.
+Qed.
 Let prob_bindDl p :
   BindLaws.left_distributive (@hierarchy.bind [the monad of acto]) (choice p).
 Proof.
