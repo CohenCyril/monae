@@ -1010,6 +1010,9 @@ End splits_prePlusMonad.
 Section qperm.
 Variables (M : altMonad) (A : UU0) (d : unit) (T : orderType d).
 
+Set Printing All.
+Set Printing Universes.
+
 Equations? qperm (s : seq A) : M (seq A) by wf (size s) lt :=
 | [::] => Ret [::]
 | x :: xs =>
