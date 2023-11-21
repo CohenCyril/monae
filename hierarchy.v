@@ -1230,32 +1230,27 @@ HB.structure Definition MonadStateTraceReify (S T : UU0) :=
   { M of isMonadStateTraceReify S T M & isFunctor M & isMonad M &
          isMonadReify S M & isMonadStateTrace S T M }.
 
-HB.mixin Record isMonadProb {R : realType} (M : UU0 -> UU0) of Monad M := {
-  choice : forall (p : {prob R}) (T : UU0), M T -> M T -> M T ;
-  (* identity axioms *)
-  choice0 : forall (T : UU0) (a b : M T), choice 0%:pr _ a b = b ;
-  choice1 : forall (T : UU0) (a b : M T), choice 1%:pr _ a b = a ;
-  (* skewed commutativity *)
-  choiceC : forall (T : UU0) p (a b : M T),
-    choice p _ a b = choice ((Prob.p p).~ %:pr) _ b a ;
-  choicemm : forall (T : UU0) p, idempotent (@choice p T) ;
-  (* quasi associativity *)
-  choiceA : forall (T : UU0) (p q r s : {prob R}) (a b c : M T),
-    (p = (r : R) * (s : R) :> R /\ (Prob.p s).~ = (Prob.p p).~ * (Prob.p q).~)%R ->
-    (*NB: needed to preserve the notation in the resulting choiceA lemma*)
-    let bc := choice q _ b c in
-    let ab := choice r _ a b in
-    choice p _ a bc = choice s _ ab c;
-  (* composition distributes leftwards over [probabilistic] choice *)
-  choice_bindDl :
-    forall p, BindLaws.left_distributive (@bind [the monad of M]) (choice p) }.
+From infotheo Require Import convex.
+
+HB.mixin Record isMonadConvex {M : UU0 -> UU0} of Monad M :=
+  { convexity : forall (T : UU0), isConvexSpace.axioms_ (M T) }.
+
+#[short(type=convexMonad)]
+HB.structure Definition MonadConvex :=
+  { M of isMonadConvex M & isFunctor M & isMonad M }.
+
+HB.instance Definition _ M T := @convexity M T.
+
+HB.mixin Record isMonadProb (M : UU0 -> UU0) of MonadConvex M := {
+  (* bind distributes leftwards over convex combination (probabilistic choice) *)
+  conv_bindDl :
+    forall p, BindLaws.left_distributive
+                (@bind [the monad of M])
+                (fun (T : UU0) (x y : [the convexMonad of M] T) => conv p x y);
+  }.
 
 #[short(type=probMonad)]
 HB.structure Definition MonadProb {R : realType} := {M of isMonadProb R M & }.
-Notation "a <| p |> b" := (choice p _ a b) : proba_monad_scope.
-Arguments choiceA {_} {_} {_} _ _ _ _ {_} {_} {_}.
-Arguments choiceC {_} {_} {_} _ _ _.
-Arguments choicemm {_} {_} {_} _.
 
 HB.mixin Record isMonadProbDr {R : realType} (M : UU0 -> UU0) of MonadProb R M := {
   (* composition distributes rightwards over [probabilistic] choice *)
